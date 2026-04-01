@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMDB Movie Fetcher</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Fetch Flow</h1>
+        
+        <div class="controls">
+            <div class="input-group">
+                <label>Search Type:</label>
+                <select id="mode">
+                    <option value="search">Search by Title</option>
+                    <option value="lookup">Lookup by ID/Title</option>
+                </select>
+            </div>
+            
+            <div class="input-group">
+                <label>Query:</label>
+                <input type="text" id="query" placeholder="Movie title or IMDb ID">
+            </div>
+            
+            <div class="input-group">
+                <label>Type:</label>
+                <select id="type">
+                    <option value="">All</option>
+                    <option value="movie">Movie</option>
+                    <option value="series">Series</option>
+                    <option value="episode">Episode</option>
+                </select>
+            </div>
+            
+            <div class="input-group">
+                <label>Year:</label>
+                <input type="text" id="year" placeholder="2020">
+            </div>
+            
+            <div class="input-group">
+                <label>Plot:</label>
+                <select id="plot">
+                    <option value="short">Short</option>
+                    <option value="full">Full</option>
+                </select>
+            </div>
+            
+            <button id="fetchBtn">Fetch</button>
+        </div>
+
+        <pre id="output">Results will appear here...</pre>
+    </div>
+
+    <script src="omdb.js"></script>
+    <script>
+        const mode = document.getElementById('mode');
+        const query = document.getElementById('query');
+        const type = document.getElementById('type');
+        const year = document.getElementById('year');
+        const plot = document.getElementById('plot');
+        const fetchBtn = document.getElementById('fetchBtn');
+        const output = document.getElementById('output');
+
+        fetchBtn.addEventListener('click', async () => {
+            const q = query.value.trim();
+            if (!q) {
+                output.textContent = 'Please enter a query';
+                return;
+            }
+
+            output.textContent = 'Loading...';
+
+            try {
+                let data;
+                if (mode.value === 'lookup') {
+                    data = await fetchMovieByIdOrTitle({
+                        id: q.startsWith('tt') ? q : null,
+                        title: q.startsWith('tt') ? null : q,
+                        type: type.value || undefined,
+                        year: year.value || undefined,
+                        plot: plot.value
+                    });
+                } else {
+                    data = await fetchMoviesBySearch({
+                        query: q,
+                        type: type.value || undefined,
+                        year: year.value || undefined
+                    });
+                }
+                output.textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                output.textContent = 'Error: ' + err.message;
+            }
+        });
+    </script>
+</body>
+</html>
