@@ -1,6 +1,9 @@
 const API_KEY = '46c6fcc8';
 const BASE_URL = 'https://www.omdbapi.com/';
 
+let cachedMovies = [];
+let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+
 async function fetchMovieByIdOrTitle({ id, title, type, year, plot = 'short' }) {
     if (!id && !title) {
         throw new Error('At least one of id or title is required');
@@ -50,6 +53,61 @@ async function fetchMoviesBySearch({ query, type, year, page = 1 }) {
     return response.json();
 }
 
-// fetchMovieByIdOrTitle({ id: 'tt1285016' })
-// fetchMovieByIdOrTitle({ title: 'Inception', plot: 'full' })
-// fetchMoviesBySearch({ query: 'Batman', page: 2 })
+// Higher-order functions for filtering, sorting, searching
+function filterMovies(movies, criteria) {
+    return movies.filter(movie => {
+        const matchesType = !criteria.type || movie.Type === criteria.type;
+        const matchesYear = !criteria.year || (movie.Year && movie.Year.startsWith(criteria.year));
+        return matchesType && matchesYear;
+    });
+}
+
+function sortMovies(movies, sortBy) {
+    return [...movies].sort((a, b) => {
+        if (sortBy === 'title-asc') {
+            return a.Title.localeCompare(b.Title);
+        }
+        if (sortBy === 'title-desc') {
+            return b.Title.localeCompare(a.Title);
+        }
+        if (sortBy === 'year-desc') {
+            return (b.Year || '').localeCompare(a.Year || '');
+        }
+        if (sortBy === 'year-asc') {
+            return (a.Year || '').localeCompare(b.Year || '');
+        }
+        if (sortBy === 'rating-desc') {
+            const ratingA = parseFloat(a.imdbRating) || 0;
+            const ratingB = parseFloat(b.imdbRating) || 0;
+            return ratingB - ratingA;
+        }
+        return 0;
+    });
+}
+
+function searchMovies(movies, query) {
+    if (!query) return movies;
+    const lowerQuery = query.toLowerCase();
+    return movies.filter(movie => 
+        movie.Title.toLowerCase().includes(lowerQuery)
+    );
+}
+
+function toggleFavorite(movie) {
+    const exists = favorites.find(f => f.imdbID === movie.imdbID);
+    if (exists) {
+        favorites = favorites.filter(f => f.imdbID !== movie.imdbID);
+    } else {
+        favorites.push(movie);
+    }
+    localStorage.setItem('favorites', JSON.stringify(favorites));
+    return !exists;
+}
+
+function isFavorite(movieId) {
+    return favorites.some(f => f.imdbID === movieId);
+}
+
+function getFavorites() {
+    return favorites;
+}

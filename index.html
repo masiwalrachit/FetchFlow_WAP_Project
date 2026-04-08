@@ -3,27 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OMDB Movie Fetcher</title>
+    <title>Movie Finder</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Fetch Flow</h1>
-        
+    <div class="app">
+        <header>
+            <h1>Movie Finder</h1>
+            <button id="themeToggle" class="theme-btn">🌙</button>
+        </header>
+
         <div class="controls">
             <div class="input-group">
-                <label>Search Type:</label>
-                <select id="mode">
-                    <option value="search">Search by Title</option>
-                    <option value="lookup">Lookup by ID/Title</option>
-                </select>
+                <label>Search:</label>
+                <input type="text" id="query" placeholder="Search movies...">
             </div>
-            
-            <div class="input-group">
-                <label>Query:</label>
-                <input type="text" id="query" placeholder="Movie title or IMDb ID">
-            </div>
-            
             <div class="input-group">
                 <label>Type:</label>
                 <select id="type">
@@ -33,67 +27,174 @@
                     <option value="episode">Episode</option>
                 </select>
             </div>
-            
             <div class="input-group">
                 <label>Year:</label>
                 <input type="text" id="year" placeholder="2020">
             </div>
-            
             <div class="input-group">
-                <label>Plot:</label>
-                <select id="plot">
-                    <option value="short">Short</option>
-                    <option value="full">Full</option>
+                <label>Sort By:</label>
+                <select id="sort">
+                    <option value="">Default</option>
+                    <option value="title-asc">Title A-Z</option>
+                    <option value="title-desc">Title Z-A</option>
+                    <option value="year-desc">Year (Newest)</option>
+                    <option value="year-asc">Year (Oldest)</option>
+                    <option value="rating-desc">Rating (High to Low)</option>
                 </select>
             </div>
-            
-            <button id="fetchBtn">Fetch</button>
+            <button id="fetchBtn">Search</button>
+            <button id="favoritesBtn">❤️ Favorites</button>
         </div>
 
-        <pre id="output">Results will appear here...</pre>
+        <div id="results" class="results"></div>
     </div>
 
     <script src="omdb.js"></script>
     <script>
-        const mode = document.getElementById('mode');
         const query = document.getElementById('query');
         const type = document.getElementById('type');
         const year = document.getElementById('year');
-        const plot = document.getElementById('plot');
+        const sort = document.getElementById('sort');
         const fetchBtn = document.getElementById('fetchBtn');
-        const output = document.getElementById('output');
+        const favoritesBtn = document.getElementById('favoritesBtn');
+        const results = document.getElementById('results');
+        const themeToggle = document.getElementById('themeToggle');
+        
+        let currentMovies = [];
+        let showingFavorites = false;
 
-        fetchBtn.addEventListener('click', async () => {
+        // Dark/Light mode
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+        themeToggle.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+
+        themeToggle.addEventListener('click', () => {
+            const current = document.body.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            themeToggle.textContent = next === 'dark' ? '🌙' : '☀️';
+        });
+
+        // Fetch and display
+        async function handleFetch() {
             const q = query.value.trim();
             if (!q) {
-                output.textContent = 'Please enter a query';
+                results.innerHTML = '<p class="message">Please enter a search term</p>';
                 return;
             }
 
-            output.textContent = 'Loading...';
+            results.innerHTML = '<p class="message">Loading...</p>';
+            showingFavorites = false;
 
             try {
-                let data;
-                if (mode.value === 'lookup') {
-                    data = await fetchMovieByIdOrTitle({
-                        id: q.startsWith('tt') ? q : null,
-                        title: q.startsWith('tt') ? null : q,
-                        type: type.value || undefined,
-                        year: year.value || undefined,
-                        plot: plot.value
-                    });
-                } else {
-                    data = await fetchMoviesBySearch({
-                        query: q,
-                        type: type.value || undefined,
-                        year: year.value || undefined
-                    });
+                const data = await fetchMoviesBySearch({ query: q });
+                if (data.Response === 'False') {
+                    results.innerHTML = `<p class="message error">${data.Error}</p>`;
+                    return;
                 }
-                output.textContent = JSON.stringify(data, null, 2);
+                currentMovies = data.Search || [];
+                renderMovies(currentMovies);
             } catch (err) {
-                output.textContent = 'Error: ' + err.message;
+                results.innerHTML = `<p class="message error">Error: ${err.message}</p>`;
             }
+        }
+
+        // Filter and Sort
+        function applyFilters() {
+            if (showingFavorites) return;
+            
+            let filtered = filterMovies(currentMovies, { type: type.value, year: year.value });
+            filtered = searchMovies(filtered, query.value);
+            filtered = sortMovies(filtered, sort.value);
+            renderMovies(filtered);
+        }
+
+        type.addEventListener('change', applyFilters);
+        year.addEventListener('change', applyFilters);
+        sort.addEventListener('change', applyFilters);
+        query.addEventListener('input', applyFilters);
+
+        // Render movies
+        function renderMovies(movies) {
+            if (movies.length === 0) {
+                results.innerHTML = '<p class="message">No movies found</p>';
+                return;
+            }
+
+            results.innerHTML = movies.map(movie => {
+                const favClass = isFavorite(movie.imdbID) ? 'favorited' : '';
+                const poster = movie.Poster !== 'N/A' 
+                    ? movie.Poster 
+                    : 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect fill="%23333" width="200" height="300"/><text x="50%" y="50%" fill="%23666" text-anchor="middle">No Image</text></svg>';
+                return `
+                    <div class="card ${favClass}">
+                        <img src="${poster}" alt="${movie.Title}" loading="lazy">
+                        <div class="card-content">
+                            <h3>${movie.Title}</h3>
+                            <p>${movie.Year} • ${movie.Type}</p>
+                            <button class="fav-btn ${favClass}" data-id="${movie.imdbID}">
+                                ${favClass ? '❤️' : '🤍'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Add favorite click handlers
+            document.querySelectorAll('.fav-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const id = btn.dataset.id;
+                    const movieData = currentMovies.find(m => m.imdbID === id) || 
+                                     getFavorites().find(m => m.imdbID === id);
+                    if (movieData) {
+                        toggleFavorite(movieData);
+                        applyFilters();
+                        if (showingFavorites) showFavorites();
+                    }
+                });
+            });
+        }
+
+        // Show favorites
+        function showFavorites() {
+            showingFavorites = true;
+            const favs = getFavorites();
+            if (favs.length === 0) {
+                results.innerHTML = '<p class="message">No favorites yet</p>';
+                return;
+            }
+            results.innerHTML = favs.map(movie => {
+                const poster = movie.Poster !== 'N/A' 
+                    ? movie.Poster 
+                    : 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect fill="%23333" width="200" height="300"/><text x="50%" y="50%" fill="%23666" text-anchor="middle">No Image</text></svg>';
+                return `
+                    <div class="card favorited">
+                        <img src="${poster}" alt="${movie.Title}" loading="lazy">
+                        <div class="card-content">
+                            <h3>${movie.Title}</h3>
+                            <p>${movie.Year} • ${movie.Type}</p>
+                            <button class="fav-btn favorited" data-id="${movie.imdbID}">❤️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.querySelectorAll('.fav-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleFavorite({ imdbID: btn.dataset.id });
+                    showFavorites();
+                });
+            });
+        }
+
+        fetchBtn.addEventListener('click', handleFetch);
+        query.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleFetch();
         });
+        favoritesBtn.addEventListener('click', showFavorites);
     </script>
 </body>
 </html>
