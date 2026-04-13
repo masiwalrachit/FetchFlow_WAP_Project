@@ -63,7 +63,6 @@
         let currentMovies = [];
         let showingFavorites = false;
 
-        // Dark/Light mode
         const savedTheme = localStorage.getItem('theme') || 'dark';
         document.body.setAttribute('data-theme', savedTheme);
         themeToggle.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
@@ -76,7 +75,6 @@
             themeToggle.textContent = next === 'dark' ? '🌙' : '☀️';
         });
 
-        // Fetch and display
         async function handleFetch() {
             const q = query.value.trim();
             if (!q) {
@@ -100,7 +98,6 @@
             }
         }
 
-        // Filter and Sort
         function applyFilters() {
             if (showingFavorites) return;
             
@@ -115,7 +112,6 @@
         sort.addEventListener('change', applyFilters);
         query.addEventListener('input', applyFilters);
 
-        // Render movies
         function renderMovies(movies) {
             if (movies.length === 0) {
                 results.innerHTML = '<p class="message">No movies found</p>';
@@ -141,7 +137,6 @@
                 `;
             }).join('');
 
-            // Add favorite click handlers
             document.querySelectorAll('.fav-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -157,7 +152,6 @@
             });
         }
 
-        // Show favorites
         function showFavorites() {
             showingFavorites = true;
             const favs = getFavorites();
